@@ -1,5 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin } from 'obsidian';
-import { DEFAULT_SETTINGS, SettingTab, ResticSettings } from './settings'
+import { SettingTab, ResticSettings } from './settings'
 import { Restic } from './restic'
 import { getVaultAbsolutePath } from './util'
 
@@ -7,17 +7,29 @@ import { getVaultAbsolutePath } from './util'
 
 
 export default class MyPlugin extends Plugin {
-	settings: ResticSettings;
+	settings: ResticSettings
+	restic: Restic | null
 
 	async onload() {
 		await this.loadSettings();
+		this.loadAndCheckRestic()
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
 			// new Notice('This is a notice!');
-			const restic = new Restic(this.settings,getVaultAbsolutePath(this.app))
-			restic.backup()
+			if (!this.restic) {
+				new Notice('restic not configured!')
+				return
+			}
+
+			this.restic.backup()
+				.then(() => {
+					new Notice('backup successfully')
+				})
+				.catch((error) => {
+					new Notice(error)
+				})
 		});
 		// Perform additional things with the ribbon
 		ribbonIconEl.addClass('my-plugin-ribbon-class');
@@ -81,11 +93,25 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign(new ResticSettings(), await this.loadData());
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.loadAndCheckRestic()
+	}
+
+	loadAndCheckRestic() {
+		if (!this.settings.check()) {
+			return
+		}
+		const vault = getVaultAbsolutePath(this.app)
+		const restic = new Restic(this.settings, vault)
+		if (!restic.isRepo()) {
+			new Notice('target path is not a valid repository')
+			return
+		}
+		this.restic = restic
 	}
 }
 
