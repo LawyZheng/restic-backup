@@ -2,32 +2,32 @@ import { App, Editor, MarkdownView, Modal, Notice, Plugin } from 'obsidian';
 import { SettingTab, ResticSettings } from './settings'
 import { Restic } from './restic'
 import { getVaultAbsolutePath } from './util'
+import { CronJob } from 'cron';
+import { DateTime } from 'luxon'
 
 // Remember to rename these classes and interfaces!
-
-
 export default class MyPlugin extends Plugin {
 	settings: ResticSettings
-	restic: Restic | null
+	restic: Restic | undefined
+	statusBar: HTMLElement
+	cron: CronJob<null, null>
 
 	async onload() {
 		await this.loadSettings();
-		this.loadAndCheckRestic()
+		await this.loadAndCheckRestic()
+		this.loadCronJob()
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
 			// Called when the user clicks the icon.
 			// new Notice('This is a notice!');
-			if (!this.restic) {
-				new Notice('restic not configured!')
-				return
-			}
-
-			this.restic.backup()
-				.then(() => {
-					new Notice('backup successfully')
+			new Notice('starting backup...')
+			this.doBackUp()
+				.then(()=> {
+					new Notice('backup successfully!!')
+					this.setStatusBar()
 				})
-				.catch((error) => {
+				.catch((error)=>{
 					new Notice(error)
 				})
 		});
@@ -36,7 +36,8 @@ export default class MyPlugin extends Plugin {
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
 		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
+		this.statusBar = statusBarItemEl
+		this.statusBar.setText('last backup: no backup since started')
 
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
@@ -98,20 +99,52 @@ export default class MyPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
-		this.loadAndCheckRestic()
+		await this.loadAndCheckRestic()
 	}
 
-	loadAndCheckRestic() {
+	async doBackUp() {
+		if (!this.restic) {
+			throw 'restic not configured!'
+		}
+
+		await this.restic.backup()
+	}
+
+	async loadAndCheckRestic() {
 		if (!this.settings.check()) {
+			this.restic = undefined
 			return
 		}
 		const vault = getVaultAbsolutePath(this.app)
 		const restic = new Restic(this.settings, vault)
+		try{
+			await restic.version()
+		} catch(error) {
+			this.restic = undefined
+			new Notice('invalid restic binary')
+			return
+		}
+
 		if (!restic.isRepo()) {
 			new Notice('target path is not a valid repository')
+			this.restic = undefined
 			return
 		}
 		this.restic = restic
+	}
+
+	setStatusBar() {
+		this.statusBar.setText("last backup: " + DateTime.local().toFormat('yyyy-MM-dd HH:mm:ss'))
+	}
+
+	loadCronJob() {
+		this.cron = CronJob.from({
+			cronTime:'*/2 * * * * *',
+			onTick: async ()=>{
+				await this.doBackUp()
+				this.setStatusBar()
+			},
+		})
 	}
 }
 
