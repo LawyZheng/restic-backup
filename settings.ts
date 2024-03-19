@@ -3,14 +3,19 @@ import { ResticBinary, Restic } from './restic'
 import { getVaultAbsolutePath } from './util'
 
 export class ResticSettings {
+	auto: boolean;
+	interval: number;
+
 	resticBin: string;
 	repo: string;
 	password: string;
 
-	constructor(bin='', repo='', password='obsidian') {
+	constructor(bin='', repo='', password='obsidian', auto=false, interval=5) {
 		this.resticBin = bin
 		this.repo = repo
 		this.password = password
+		this.auto = auto
+		this.interval = interval
 	}
 
 	check(): boolean {
@@ -32,28 +37,36 @@ export class ResticSettings {
 interface PluginInterface extends Plugin {
 	settings: ResticSettings
 	saveSettings(): Promise<void>
+	setCronJob(minute: number): void
 }
 
 export class SettingTab extends PluginSettingTab {
+	private resticSetting: ResticSettings
+
 	private versionEl: Setting
 	private repoEl: Setting
 	private resticVersion: string
-	private setting: ResticSettings
 
 	plugin: PluginInterface;
 
 	constructor(app: App, plugin: PluginInterface) {
 		super(app, plugin);
 		this.plugin = plugin
-		this.setting = new ResticSettings(plugin.settings.resticBin, plugin.settings.repo, plugin.settings.password)
+		this.resticSetting = new ResticSettings(
+			plugin.settings.resticBin, 
+			plugin.settings.repo, 
+			plugin.settings.password, 
+			plugin.settings.auto,
+			plugin.settings.interval,
+		)
 	}
 
 	private setResticVersion(): void {
-		this.setting.getResticBinary().version()
+		this.resticSetting.getResticBinary().version()
 			.then((v: string) => {
 				this.versionEl.setDesc("Restic version: " + v)
 				this.resticVersion = v
-				if (!this.setting.check()) {
+				if (!this.resticSetting.check()) {
 					return
 				}
 				this.checkRepo()
@@ -66,7 +79,7 @@ export class SettingTab extends PluginSettingTab {
 	}
 
 	private checkRepo(): void {
-		const _setting = this.setting
+		const _setting = this.resticSetting
 
 		if (!this.resticVersion) {
 			new Notice('not restic found')
@@ -106,13 +119,13 @@ export class SettingTab extends PluginSettingTab {
 				.setPlaceholder('eg: /usr/bin/restic')
 				.setValue(this.plugin.settings.resticBin)
 				.onChange((value) => {
-					this.setting.resticBin = value
+					this.resticSetting.resticBin = value
 				}))
 			.addButton(btn => btn
 				.setButtonText('Detect')
 				.onClick(async _evt => {
 					this.setResticVersion()
-					this.plugin.settings.resticBin = this.setting.resticBin
+					this.plugin.settings.resticBin = this.resticSetting.resticBin
 					await this.plugin.saveSettings()
 				})
 			);
@@ -129,7 +142,7 @@ export class SettingTab extends PluginSettingTab {
 				.setPlaceholder('eg: /myrepo')
 				.setValue(this.plugin.settings.repo)
 				.onChange((value) => {
-					this.setting.repo = value
+					this.resticSetting.repo = value
 				}));
 
 		new Setting(containerEl)
@@ -138,7 +151,7 @@ export class SettingTab extends PluginSettingTab {
 			.addText(text => text
 				.setValue(this.plugin.settings.password)
 				.onChange((value) => {
-					this.setting.password = value
+					this.resticSetting.password = value
 				}))
 			.setHeading();
 
@@ -148,13 +161,47 @@ export class SettingTab extends PluginSettingTab {
 				.setButtonText('Confrim')
 				.onClick(async _evt => {
 					this.checkRepo()
-					this.plugin.settings.password = this.setting.password
-					this.plugin.settings.repo = this.setting.repo
+					this.plugin.settings.password = this.resticSetting.password
+					this.plugin.settings.repo = this.resticSetting.repo
 					await this.plugin.saveSettings()
 				})
 			)
 			.setHeading()
+		
+	    new Setting(containerEl)
+			.setName('Backup Interval')
+			.setDesc('interval minutes of auto backup')
+			.addDropdown(drop => drop
+				.addOptions(
+					{
+						'1': '1 mins',
+						'5': '5 mins',
+						'10': '10 mins',
+						'30': '30 mins',
+						'60': '60 mins',
+					},
+				)
+				.setValue(this.plugin.settings.interval.toString())
+				.onChange(async (value) =>{
+					const minutes = parseInt(value)
+					this.plugin.settings.interval = minutes 
+					await this.plugin.saveSettings()
+					this.plugin.setCronJob(minutes)
+				})
+			)
 
+			new Setting(containerEl)
+			.setName('Enable Auto Backup')
+			.setDesc('turn on/off auto backup')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.auto)
+				.onChange(async (value)=>{
+					this.plugin.settings.auto = value
+					await this.plugin.saveSettings()
+				})
+			)
+			.setHeading()
+		
 		this.load()
 	}
 

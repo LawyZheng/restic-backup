@@ -10,6 +10,7 @@ export default class MyPlugin extends Plugin {
 	settings: ResticSettings
 	restic: Restic | undefined
 	statusBar: HTMLElement
+	intervalTaskId: number
 	cron: CronJob<null, null>
 
 	async onload() {
@@ -81,16 +82,37 @@ export default class MyPlugin extends Plugin {
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
+		// this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
+		// 	console.log('click', evt);
+		// });
 
 		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// this.registerInterval(
+		// 	window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000)
+		// );
+
 	}
 
 	onunload() {
 
+	}
+
+	setCronJob(minute: number) {
+		if (this.intervalTaskId) {
+			window.clearInterval(this.intervalTaskId)
+			this.intervalTaskId = 0
+			console.log('interval task cleared.')
+		}
+
+		this.intervalTaskId = window.setInterval(() => {
+			if (this.settings.auto) {
+				console.log('interval executed!')
+				this.cron.fireOnTick()
+			}
+		}, minute * 1000)
+		console.log('interval task id: ', this.intervalTaskId)
+
+		this.registerInterval(this.intervalTaskId)
 	}
 
 	async loadSettings() {
@@ -139,12 +161,16 @@ export default class MyPlugin extends Plugin {
 
 	loadCronJob() {
 		this.cron = CronJob.from({
-			cronTime:'*/2 * * * * *',
+			cronTime:'* * * * * *',
 			onTick: async ()=>{
 				await this.doBackUp()
 				this.setStatusBar()
 			},
 		})
+
+		if (this.settings.auto) {
+			this.setCronJob(this.settings.interval)
+		}
 	}
 }
 
