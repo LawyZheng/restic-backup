@@ -1,9 +1,20 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin } from 'obsidian';
+import { App, Editor, ItemView, MarkdownView, Modal, Notice, Plugin, WorkspaceLeaf } from 'obsidian';
 import { SettingTab, ResticSettings } from './settings'
 import { Restic } from './restic'
 import { getVaultAbsolutePath } from './util'
 import { CronJob } from 'cron';
 import { DateTime } from 'luxon'
+
+export class BackupView extends ItemView {
+
+	constructor(leaf: WorkspaceLeaf) {
+		super(leaf);
+	}
+
+	getViewType(): string {
+        return 'my-plugin-view';
+    }
+}
 
 // Remember to rename these classes and interfaces!
 export default class MyPlugin extends Plugin {
@@ -40,12 +51,31 @@ export default class MyPlugin extends Plugin {
 		this.statusBar = statusBarItemEl
 		this.statusBar.setText('last backup: no backup since started')
 
+		this.registerView('my-plugin-view', (leaf) => {
+			return new BackupView(leaf)
+		})
+
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
 			id: 'open-sample-modal-simple',
 			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
+			callback: async () => {
+				const leafs = this.app.workspace.getLeavesOfType('my-plugin-view')
+				let leaf: WorkspaceLeaf | null | undefined;
+				if (leafs.length === 0) {
+					leaf = this.app.workspace.getRightLeaf(false);
+					await leaf?.setViewState({
+						type: 'my-plugin-view'
+					})
+				}else{
+					leaf = leafs.first()
+				}
+				if (!leaf) {
+					return
+				}
+
+				this.app.workspace.revealLeaf(leaf);
+				// new SampleModal(this.app).open();
 			}
 		});
 		// This adds an editor command that can perform some operation on the current editor instance
