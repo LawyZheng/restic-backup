@@ -1,20 +1,10 @@
-import { App, Editor, ItemView, MarkdownView, Modal, Notice, Plugin, WorkspaceLeaf } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, WorkspaceLeaf } from 'obsidian';
 import { SettingTab, ResticSettings } from './settings'
+import { ResticBackupView, RESTIC_BACKUP_VIEW_CONFIG } from './view';
 import { Restic } from './restic'
 import { getVaultAbsolutePath } from './util'
 import { CronJob } from 'cron';
 import { DateTime } from 'luxon'
-
-export class BackupView extends ItemView {
-
-	constructor(leaf: WorkspaceLeaf) {
-		super(leaf);
-	}
-
-	getViewType(): string {
-        return 'my-plugin-view';
-    }
-}
 
 // Remember to rename these classes and interfaces!
 export default class MyPlugin extends Plugin {
@@ -28,32 +18,12 @@ export default class MyPlugin extends Plugin {
 		await this.loadSettings();
 		await this.loadAndCheckRestic()
 		this.loadCronJob()
+		this.loadView()
+		this.loadRibbon()
+		this.loadStatusBar()
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			// new Notice('This is a notice!');
-			new Notice('starting backup...')
-			this.doBackUp()
-				.then(()=> {
-					new Notice('backup successfully!!')
-					this.setStatusBar()
-				})
-				.catch((error)=>{
-					new Notice(error)
-				})
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		this.statusBar = statusBarItemEl
-		this.statusBar.setText('last backup: no backup since started')
-
-		this.registerView('my-plugin-view', (leaf) => {
-			return new BackupView(leaf)
-		})
+		// This adds a settings tab so the user can configure various aspects of the plugin
+		this.addSettingTab(new SettingTab(this.app, this));
 
 		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
@@ -107,8 +77,6 @@ export default class MyPlugin extends Plugin {
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SettingTab(this.app, this));
 
 		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
 		// Using this function will automatically remove the event listener when this plugin is disabled.
@@ -124,7 +92,7 @@ export default class MyPlugin extends Plugin {
 	}
 
 	onunload() {
-
+		this.app.workspace.detachLeavesOfType(RESTIC_BACKUP_VIEW_CONFIG.type);
 	}
 
 	setCronJob(minute: number) {
@@ -139,8 +107,8 @@ export default class MyPlugin extends Plugin {
 				console.log('interval executed!')
 				this.cron.fireOnTick()
 			}
-		}, minute * 1000)
-		console.log('interval task id: ', this.intervalTaskId)
+		}, minute * 60 * 1000)
+		// console.log('interval task id: ', this.intervalTaskId)
 
 		this.registerInterval(this.intervalTaskId)
 	}
@@ -185,6 +153,24 @@ export default class MyPlugin extends Plugin {
 		this.restic = restic
 	}
 
+	async activateView() {
+		const leafs = this.app.workspace.getLeavesOfType(RESTIC_BACKUP_VIEW_CONFIG.type)
+		let leaf: WorkspaceLeaf | null | undefined;
+		if (leafs.length === 0) {
+			leaf = this.app.workspace.getRightLeaf(false);
+			await leaf?.setViewState({
+				type: RESTIC_BACKUP_VIEW_CONFIG.type,
+				active: true,
+			})
+		}else{
+			leaf = leafs.first()
+		}
+		if (!leaf) {
+			return
+		}
+		this.app.workspace.revealLeaf(leaf);
+	}
+
 	setStatusBar() {
 		this.statusBar.setText("last backup: " + DateTime.local().toFormat('yyyy-MM-dd HH:mm:ss'))
 	}
@@ -194,14 +180,48 @@ export default class MyPlugin extends Plugin {
 			cronTime:'* * * * * *',
 			onTick: async ()=>{
 				await this.doBackUp()
+				// console.log("backuped")
 				this.setStatusBar()
 			},
 		})
 
-		if (this.settings.auto) {
-			this.setCronJob(this.settings.interval)
-		}
+		this.setCronJob(this.settings.interval)
 	}
+
+	loadView() {
+		this.registerView(RESTIC_BACKUP_VIEW_CONFIG.type, (leaf) => {
+			return new ResticBackupView(leaf)
+		})
+	}
+
+	loadRibbon() {
+		// This creates an icon in the left ribbon.
+		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
+			// Called when the user clicks the icon.
+			// new Notice('This is a notice!');
+			this.activateView()
+		
+			// new Notice('starting backup...')
+			// this.doBackUp()
+			// 	.then(()=> {
+			// 		new Notice('backup successfully!!')
+			// 		this.setStatusBar()
+			// 	})
+			// 	.catch((error)=>{
+			// 		new Notice(error)
+			// 	})
+		});
+		// Perform additional things with the ribbon
+		ribbonIconEl.addClass('my-plugin-ribbon-class');
+	}
+
+	loadStatusBar() {
+		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
+		const statusBarItemEl = this.addStatusBarItem();
+		this.statusBar = statusBarItemEl
+		this.statusBar.setText('last backup: no backup since started')
+	}
+
 }
 
 class SampleModal extends Modal {

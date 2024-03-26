@@ -168,7 +168,7 @@ export class SettingTab extends PluginSettingTab {
 			)
 			.setHeading()
 		
-	    new Setting(containerEl)
+		new Setting(containerEl)
 			.setName('Backup Interval')
 			.setDesc('interval minutes of auto backup')
 			.addDropdown(drop => drop
