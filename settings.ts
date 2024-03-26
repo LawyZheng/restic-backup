@@ -158,7 +158,7 @@ export class SettingTab extends PluginSettingTab {
 		this.repoEl = new Setting(containerEl)
 			.setDesc('Repository status: unknown')
 			.addButton(btn => btn
-				.setButtonText('Confrim')
+				.setButtonText('Confirm')
 				.onClick(async _evt => {
 					this.checkRepo()
 					this.plugin.settings.password = this.resticSetting.password

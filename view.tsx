@@ -32,8 +32,8 @@ export class ResticBackupView extends ItemView {
 		this.root = createRoot(this.containerEl.children[1]);
 		this.root.render(
 			<StrictMode>
-				<ReactView />,
-			</StrictMode>,
+				<ReactView/>
+			</StrictMode>
 		);
 		// const container = this.containerEl.children[1];
 		// container.empty();
