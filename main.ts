@@ -15,6 +15,8 @@ export default class MyPlugin extends Plugin {
 	cron: CronJob<null, null>
 
 	async onload() {
+		addEventListener("backup-success", this.setStatusBar.bind(this));
+
 		await this.loadSettings();
 		await this.loadAndCheckRestic()
 		this.loadCronJob()
@@ -181,17 +183,11 @@ export default class MyPlugin extends Plugin {
 			onTick: async ()=>{
 				await this.doBackUp()
 				// console.log("backuped")
-				this.setStatusBar()
+				dispatchEvent(new CustomEvent("backup-success"));
 			},
 		})
 
 		this.setCronJob(this.settings.interval)
-	}
-
-	loadView() {
-		this.registerView(RESTIC_BACKUP_VIEW_CONFIG.type, (leaf) => {
-			return new ResticBackupView(leaf)
-		})
 	}
 
 	loadRibbon() {
@@ -222,6 +218,11 @@ export default class MyPlugin extends Plugin {
 		this.statusBar.setText('last backup: no backup since started')
 	}
 
+	loadView() {
+		this.registerView(RESTIC_BACKUP_VIEW_CONFIG.type, (leaf) => {
+			return new ResticBackupView(leaf, this.restic)
+		})
+	}
 }
 
 class SampleModal extends Modal {

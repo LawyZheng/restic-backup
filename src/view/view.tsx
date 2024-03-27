@@ -1,7 +1,8 @@
-import { WorkspaceLeaf, ItemView } from "obsidian";
-import { StrictMode } from "react";
-import { ReactView } from "src/view/components/ReactView";
+import { App, WorkspaceLeaf, ItemView } from "obsidian";
+import { createContext } from "react";
+import { ViewApp } from "src/view/components/ViewApp";
 import { Root, createRoot } from "react-dom/client";
+import { Restic } from "src/restic/restic";
 
 export const RESTIC_BACKUP_VIEW_CONFIG = {
     type: 'restic-backup-view',
@@ -9,11 +10,15 @@ export const RESTIC_BACKUP_VIEW_CONFIG = {
     icon: '',
 }
 
-export class ResticBackupView extends ItemView {
-    root: Root | null = null;
+export const AppContext = createContext<App | undefined>(undefined);
 
-	constructor(leaf: WorkspaceLeaf) {
+export class ResticBackupView extends ItemView {
+    private root: Root | null = null;
+    private restic: Restic| undefined = undefined;
+
+	constructor(leaf: WorkspaceLeaf, restic: Restic| undefined) {
 		super(leaf);
+        this.restic = restic
 	}
 
 	getViewType(): string {
@@ -31,13 +36,10 @@ export class ResticBackupView extends ItemView {
 	async onOpen() {
 		this.root = createRoot(this.containerEl.children[1]);
 		this.root.render(
-			<StrictMode>
-				<ReactView/>
-			</StrictMode>
+            <AppContext.Provider value={this.app}>
+				<ViewApp restic={this.restic} />
+            </AppContext.Provider>
 		);
-		// const container = this.containerEl.children[1];
-		// container.empty();
-		// container.createEl("h4", { text: "Example view" });
 	}
 
     async onClose() {
