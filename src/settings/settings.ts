@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting, Plugin, Notice } from 'obsidian'
-import { ResticBinary, Restic } from './restic'
-import { getVaultAbsolutePath } from './util'
+import { ResticBinary, Restic } from 'src/restic/restic'
+import { getVaultAbsolutePath } from 'src/util/path'
 
 export class ResticSettings {
 	auto: boolean;

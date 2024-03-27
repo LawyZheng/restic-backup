@@ -1,8 +1,8 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, WorkspaceLeaf } from 'obsidian';
-import { SettingTab, ResticSettings } from './settings'
-import { ResticBackupView, RESTIC_BACKUP_VIEW_CONFIG } from './view';
-import { Restic } from './restic'
-import { getVaultAbsolutePath } from './util'
+import { SettingTab, ResticSettings } from 'src/settings/settings'
+import { ResticBackupView, RESTIC_BACKUP_VIEW_CONFIG } from 'src/view/view';
+import { Restic } from 'src/restic/restic'
+import { getVaultAbsolutePath } from 'src/util/path'
 import { CronJob } from 'cron';
 import { DateTime } from 'luxon'
 

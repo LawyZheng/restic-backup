@@ -1,6 +1,6 @@
 import { WorkspaceLeaf, ItemView } from "obsidian";
 import { StrictMode } from "react";
-import { ReactView } from "./ReactView";
+import { ReactView } from "src/view/components/ReactView";
 import { Root, createRoot } from "react-dom/client";
 
 export const RESTIC_BACKUP_VIEW_CONFIG = {
