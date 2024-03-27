@@ -5,6 +5,8 @@ import { Notice } from 'obsidian'
 import { CaretRightOutlined, FolderViewOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { Restic } from 'src/restic/restic';
 
+import { FileSnapshot } from 'src/view/components/FileSnapshot';
+
 const { Header, Footer, Content } = Layout;
 
 const headerStyle: CSSProperties = {
@@ -18,6 +20,7 @@ const headerStyle: CSSProperties = {
 };
 
 const contentStyle: CSSProperties = {
+  paddingTop: 10,
   textAlign: 'center',
   minHeight: 120,
   lineHeight: '120px',
@@ -95,7 +98,7 @@ export const ViewApp = (props: ViewAppProps) =>  {
       />
     </Header>
     <Content style={contentStyle}>
-      {/* <Greeting /> */}
+      <FileSnapshot restic={_restic}/>
     </Content>
     <Footer style={footerStyle}></Footer>
   </Layout>

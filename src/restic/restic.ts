@@ -150,6 +150,9 @@ export class Restic {
         return this.bin.version()
     }
 
+    findFileInSnapshots(file: string): {
+    }
+
     isRepo(): boolean {
         return this.bin.isRepo(this.setting.repo)
     }
