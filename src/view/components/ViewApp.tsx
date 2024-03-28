@@ -1,11 +1,12 @@
 
-import { CSSProperties } from 'react';
+import { CSSProperties, useRef } from 'react';
 import { Layout } from 'antd';
 import { Notice } from 'obsidian'
 import { CaretRightOutlined, FolderViewOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { Restic } from 'src/restic/restic';
 
-import { FileSnapshot } from 'src/view/components/FileSnapshot';
+import { FileSnapshot, FileSnapshotMethod } from 'src/view/components/FileSnapshot';
+import { useApp } from '../hook/app';
 
 const { Header, Footer, Content } = Layout;
 
@@ -46,27 +47,7 @@ const iconStyle: CSSProperties = {
   color: 'inherit',
 }
 
-const iconMouseEnter = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-  const _cur = event.currentTarget;
-  _cur.style.color = 'var(--icon-color-hover)'
-}
 
-const iconMouseLeave = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-  const _cur = event.currentTarget;
-  _cur.style.color = 'inherit'
-}
-
-const clickBackup = (restic: Restic | undefined) => () => {
-  new Notice('starting backup...')
-  restic?.backup()
-    .then(()=> {
-      new Notice('backup successfully!!')
-      dispatchEvent(new CustomEvent("backup-success"));
-    })
-    .catch((error)=>{
-      new Notice(error)
-    })
-}
 
 type ViewAppProps = {
   restic: Restic | undefined
@@ -74,6 +55,34 @@ type ViewAppProps = {
 
 export const ViewApp = (props: ViewAppProps) =>  {
   const _restic = props.restic
+  const _fileSnapshotRef = useRef<FileSnapshotMethod>()
+  const app = useApp()
+
+  const iconMouseEnter = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    const _cur = event.currentTarget;
+    _cur.style.color = 'var(--icon-color-hover)'
+
+    console.log(app?.workspace.getActiveFile()?.path)
+
+    _fileSnapshotRef.current?.refreshSnapshots(app?.workspace.getActiveFile()?.path)
+  }
+  
+  const iconMouseLeave = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    const _cur = event.currentTarget;
+    _cur.style.color = 'inherit'
+  }
+
+  const clickBackup = (restic: Restic | undefined) => () => {
+    new Notice('starting backup...')
+    restic?.backup()
+      .then(()=> {
+        new Notice('backup successfully!!')
+        dispatchEvent(new CustomEvent("backup-success"));
+      })
+      .catch((error)=>{
+        new Notice(error)
+      })
+  }
 
   return <Layout style={layoutStyle}>
     <Header style={headerStyle}>
@@ -98,7 +107,7 @@ export const ViewApp = (props: ViewAppProps) =>  {
       />
     </Header>
     <Content style={contentStyle}>
-      <FileSnapshot restic={_restic}/>
+      <FileSnapshot restic={_restic} ref={_fileSnapshotRef}/>
     </Content>
     <Footer style={footerStyle}></Footer>
   </Layout>

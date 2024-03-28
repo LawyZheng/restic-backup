@@ -3,6 +3,8 @@ import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
 
+import { Match } from './type'
+
 const execFileAsync = promisify(execFile)
 
 interface setting {
@@ -150,7 +152,14 @@ export class Restic {
         return this.bin.version()
     }
 
-    findFileInSnapshots(file: string): {
+    async findFileInSnapshots(pattern: string, snapshot_ids?: string[]): Promise<Match[]> {
+        const args: string[] = ['--json', 'find', pattern]
+        for(let i=0; snapshot_ids && i < snapshot_ids.length; i++ ) {
+            args.push('--snapshot', snapshot_ids[i])
+        }
+        const stdout = await this.bin.execWithStdout(args)
+        const matches: Match[] = JSON.parse(stdout)
+        return matches
     }
 
     isRepo(): boolean {
