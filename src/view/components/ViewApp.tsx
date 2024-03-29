@@ -5,7 +5,7 @@ import { Notice } from 'obsidian'
 import { CaretRightOutlined, FolderViewOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { Restic } from 'src/restic/restic';
 
-import { FileSnapshot, FileSnapshotMethod } from 'src/view/components/FileSnapshot';
+import { FileSnapshot, FileSnapshotMethods } from 'src/view/components/FileSnapshot';
 import { useApp } from '../hook/app';
 
 const { Header, Footer, Content } = Layout;
@@ -47,24 +47,20 @@ const iconStyle: CSSProperties = {
   color: 'inherit',
 }
 
-
-
 type ViewAppProps = {
   restic: Restic | undefined
 }
 
 export const ViewApp = (props: ViewAppProps) =>  {
   const _restic = props.restic
-  const _fileSnapshotRef = useRef<FileSnapshotMethod>()
+  const _fileSnapshotRef = useRef<FileSnapshotMethods>(null)
   const app = useApp()
+  const _curFile = app?.workspace.getActiveFile()?.path
 
   const iconMouseEnter = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     const _cur = event.currentTarget;
     _cur.style.color = 'var(--icon-color-hover)'
-
-    console.log(app?.workspace.getActiveFile()?.path)
-
-    _fileSnapshotRef.current?.refreshSnapshots(app?.workspace.getActiveFile()?.path)
+    // _fileSnapshotRef.current?.refreshSnapshots(app?.workspace.getActiveFile()?.path)
   }
   
   const iconMouseLeave = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
@@ -107,7 +103,7 @@ export const ViewApp = (props: ViewAppProps) =>  {
       />
     </Header>
     <Content style={contentStyle}>
-      <FileSnapshot restic={_restic} ref={_fileSnapshotRef}/>
+      <FileSnapshot restic={_restic} initFile={_curFile} ref={_fileSnapshotRef}/>
     </Content>
     <Footer style={footerStyle}></Footer>
   </Layout>

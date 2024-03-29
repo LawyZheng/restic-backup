@@ -3,7 +3,7 @@ import { promisify } from 'util'
 import * as fs from 'fs'
 import * as path from 'path'
 
-import { Match } from './type'
+import { Match, Snapshot } from './type'
 
 const execFileAsync = promisify(execFile)
 
@@ -87,6 +87,12 @@ export class ResticBinary {
         }
     }
 
+    async execWithType<T>(args: string[]): Promise<T> {
+        const stdout = await this.execWithStdout(args)
+        const data: T = JSON.parse(stdout)
+        return data
+    }
+
     async version(): Promise<string> {
         const stdout = await this.execWithStdout(['version'])
         if (!stdout.startsWith('restic')){
@@ -153,13 +159,29 @@ export class Restic {
     }
 
     async findFileInSnapshots(pattern: string, snapshot_ids?: string[]): Promise<Match[]> {
+        if (pattern.startsWith('-')) {
+            pattern = '\\' + pattern
+        }
+
         const args: string[] = ['--json', 'find', pattern]
         for(let i=0; snapshot_ids && i < snapshot_ids.length; i++ ) {
             args.push('--snapshot', snapshot_ids[i])
         }
-        const stdout = await this.bin.execWithStdout(args)
-        const matches: Match[] = JSON.parse(stdout)
-        return matches
+        const data = await this.bin.execWithType<Match[]>(args)
+        data.reverse()
+        return data
+    }
+
+    async getSnapshotById(... ids: string[]): Promise<Snapshot|null> {
+        if (!ids) {
+            return null
+        }
+        const args: string[] = ['--json', 'snapshots', ...ids]
+        const data: Snapshot[] = await this.bin.execWithType<Snapshot[]>(args)
+        if (!data){
+            return null
+        }
+        return data[0]
     }
 
     isRepo(): boolean {
