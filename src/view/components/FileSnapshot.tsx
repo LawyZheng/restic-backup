@@ -1,8 +1,17 @@
-import { CSSProperties, forwardRef, useRef, Component, ReactNode, useEffect, useImperativeHandle, useState } from 'react';
+import { CSSProperties, forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Restic } from 'src/restic/restic';
 import { Tree } from 'antd'
 import { TreeDataNode, Empty } from 'antd'
 import { DateTime } from 'luxon';
+import { useApp } from 'src/view/hook/app';
+import { TFile } from 'obsidian';
+
+class context {
+    isCancelled: boolean 
+    cancel(){
+        this.isCancelled = true
+    }
+}
 
 const treeStyle: CSSProperties = {
     color: 'var(--nav-item-color)',
@@ -19,7 +28,6 @@ const emptyImageStyle: CSSProperties = {
 
 type FileSnapshotProps = {
     restic: Restic | undefined
-    initFile: string| undefined
 }
 
 export interface FileSnapshotMethods {
@@ -29,11 +37,16 @@ export interface FileSnapshotMethods {
 export const FileSnapshot = forwardRef<FileSnapshotMethods, FileSnapshotProps>((props, ref) => {
     const [treeData, setTreeData] = useState<TreeDataNode[]>([])
     const [windowHeight, setWindowHeight] = useState(window.innerHeight)
+    const _app = useApp()
+    let _ctx : context = new context()
 
-    const getFileSnapshots = async (restic: Restic | undefined, pattern: string) => {
+    const getFileSnapshots = async (ctx: context, restic: Restic | undefined, pattern: string) => {
+        // empty data
+        setTreeData([])
+
         let matches = await restic?.findFileInSnapshots(pattern)
         if (!matches) {
-            return []
+            return
         }
         
         // filter the path with ending string
@@ -48,124 +61,69 @@ export const FileSnapshot = forwardRef<FileSnapshotMethods, FileSnapshotProps>((
             return false
         })
 
-        console.log('matches: ', matches)
         const nodes : TreeDataNode[]  = []
-        for(let i=0; i< matches.length ; i++)  {
-            const match = matches[i]
-            const snap = await restic?.getSnapshotById(match.snapshot)
-            if (!snap) {
-                continue
-            }
-            // console.log('snap: ', snap)
-            const t = DateTime.fromISO(snap.time)
-            const node = {
-                title: t.toFormat('yyyy-MM-dd HH:mm:ss'),
-                key: match.snapshot,
-            }
-            // return {
-            //     title: t.toFormat('yyyy-MM-dd HH:mm:ss'),
-            //     key: match.snapshot,
-            // }
-            console.log("nodes.length: ",  nodes.length)
-            console.log('treeData.length: ', treeData.length)
-            setTreeData(() => {
-                return [...nodes, node]
-                // console.log(preData)
-                // return [...treeData, node]
-            })
-            nodes.push(node)
-        }
-        return
-
-        const pace = 5
+        const pace = 3
         const chunks = []
+        console.log("matches.length: ", matches.length)
         for (let i=0; i<matches.length; i+=pace) {
             chunks.push(matches.slice(i, i+pace))
         }
 
-
+        if (chunks.length === 0) {
+            setTreeData([])
+            return
+        }
 
         for (const chunk of chunks) {
             const result = await Promise.all(chunk.map(async(match): Promise<TreeDataNode|null> =>{
-                const snap = await restic?.getSnapshotById(match.snapshot)
+                const _match = match
+                const snap = await restic?.getSnapshotById(_match.snapshot)
                 if (!snap) {
                     return null
                 }
                 const t = DateTime.fromISO(snap.time)
                 return {
                     title: t.toFormat('yyyy-MM-dd HH:mm:ss'),
-                    key: match.snapshot,
+                    key: _match.snapshot,
                 }
             }))
+
+            if (ctx.isCancelled) {
+                console.log("find ["+ pattern +"] snapshots cancelled.")
+                return
+            }
 
             const noNullResult: TreeDataNode[] = result.filter((node): node is TreeDataNode=> {
                 return node !== null
             })
 
-            console.log("result: ", noNullResult)
-
             nodes.push(...noNullResult)
-            console.log("nodes: ", nodes)
-
-            setTreeData(nodes)
+            setTreeData([...nodes])
         }
-
-        // const promises = matches.map(async(match): Promise<TreeDataNode> => {
-        //     for (let i=0; i<match.matches.length; i++) {
-        //         const file = match.matches[i]
-        //         if (!reg.test(file.path)) {
-        //             continue
-        //         }
-    
-        //         const snap = await restic?.getSnapshotById(match.snapshot)
-        //         if (!snap) {
-        //             continue
-        //         }
-        //         const t = DateTime.fromISO(snap.time)
-        //         return {
-        //             title: t.toFormat('yyyy-MM-dd HH:mm:ss'),
-        //             key: match.snapshot,
-        //         }
-        //     }
-    
-        //     return {title: '', key: ''}
-        // })
-        // const nodes = await Promise.all(promises)
-        // console.log('nodes: ', nodes)
-        // return nodes
-    
-        // for(let i=0; i<matches.length; i++) {
-        //     const match = matches[i]
-        //     for (let j=0; j<match.matches.length; j++) {
-        //         const file = match.matches[j]
-        //         if (reg.test(file.path)) {
-        //             // create node
-        //             const snap =  await restic?.getSnapshotById(match.snapshot)
-        //             if (!snap) {
-        //                 continue
-        //             }
-        //             const t = DateTime.fromISO(snap.time)
-        //             nodes.push({
-        //                 title: t.toFormat('yyyy-MM-dd HH:mm:ss'),
-        //                 key: match.snapshot, 
-        //             })
-        //             break
-        //         }
-        //     }
-        // }
-        // return nodes
     }
 
-    const refreshSnapshots = async (pattern: string | undefined) => {
-        if (pattern) {
-            await getFileSnapshots(props.restic, pattern)
-        }else{
+    const refreshSnapshots = async (pattern: string | undefined ) => {
+        _ctx.cancel()
+        _ctx = new context()
+        if (!pattern) {
             setTreeData([])
+            return
         }
+        await getFileSnapshots(_ctx, props.restic, pattern)
     }
 
-    const handleResize = ()=> {
+    const handleBackupSuccess = () => {
+        const _cur = _app?.workspace.getActiveFile()?.path
+        refreshSnapshots(_cur)
+    }
+
+    const handleResize = () => {
         setWindowHeight(window.innerHeight)
+    }
+
+    const handleFileChange = (file: TFile) => {
+        console.log("active file changed: ", file.path)
+        refreshSnapshots(file.path)
     }
 
     useImperativeHandle(ref, ()=>{
@@ -174,13 +132,18 @@ export const FileSnapshot = forwardRef<FileSnapshotMethods, FileSnapshotProps>((
         }
     })
 
-
     useEffect(() => {
-        refreshSnapshots(props.initFile)
+        const _cur = _app?.workspace.getActiveFile()?.path
+        refreshSnapshots(_cur)
 
+        _app?.workspace.on('file-open', handleFileChange)
         window.addEventListener('resize', handleResize)
+        window.addEventListener('backup-success', handleBackupSuccess)
+
         return () => {
+            _app?.workspace.off('file-open', handleFileChange)
             window.removeEventListener('resize', handleResize)
+            window.removeEventListener('backup-success', handleBackupSuccess)
         }
 
     }, [])
