@@ -6,6 +6,7 @@ import * as path from 'path'
 import { Match, Snapshot } from './type'
 
 const execFileAsync = promisify(execFile)
+const writeFileAsync = promisify(fs.writeFile)
 
 interface setting {
     resticBin: string;
@@ -64,23 +65,37 @@ export class ResticBinary {
         return true
     }
 
-    exec(args: string[]): PromiseWithChild<{stdout: string, stderr: string}> {
+    exec(args: string[]): PromiseWithChild<{stdout: Buffer, stderr: Buffer}> {
         return execFileAsync(
             this.binPath, 
             args, 
             {
+                encoding: 'buffer',
                 env: this.env,
             },
         )
     }
 
+    async execWithBuffer(args: string[]): Promise<Buffer> {
+        try {
+            const {stdout, stderr} = await this.exec(args)
+            if (stderr.toString()) {
+                console.error(stderr.toString())
+            }
+            return stdout
+        } catch (error) {
+            console.error(error)
+            throw error
+        }
+    }
+
     async execWithStdout(args: string[]): Promise<string> {
         try {
             const {stdout, stderr} = await this.exec(args)
-            if (stderr) {
-                console.error(stderr)
+            if (stderr.toString()) {
+                console.error(stderr.toString())
             }
-            return stdout
+            return stdout.toString()
         } catch (error) {
             console.error(error)
             throw error
@@ -182,6 +197,16 @@ export class Restic {
             return null
         }
         return data[0]
+    }
+
+    // use 'restic dump'
+    async restoreFile(snapshotId: string, src: string, dst: string) {
+        const buffer = await this.bin.execWithBuffer(['dump', snapshotId, src])
+        await writeFileAsync(dst, buffer)
+    }
+    
+    getCurrentVault():string {
+        return this.vaultPath
     }
 
     isRepo(): boolean {

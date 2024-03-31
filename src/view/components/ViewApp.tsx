@@ -1,11 +1,12 @@
 
-import { CSSProperties, useRef } from 'react';
+import { CSSProperties, useRef, useState } from 'react';
 import { Layout } from 'antd';
 import { Notice } from 'obsidian'
 import { CaretRightOutlined, FolderViewOutlined, FileSearchOutlined } from '@ant-design/icons';
 import { Restic } from 'src/restic/restic';
 
 import { FileSnapshot, FileSnapshotMethods } from 'src/view/components/FileSnapshot';
+import { VaultSnapshot } from 'src/view/components/VaultSnapshot';
 
 const { Header, Footer, Content } = Layout;
 
@@ -43,7 +44,7 @@ const layoutStyle: CSSProperties = {
 const iconStyle: CSSProperties = {
   fontSize: '18px',
   padding: '0 5px',
-  color: 'inherit',
+  color: 'var(--nav-item-color)',
 }
 
 type ViewAppProps = {
@@ -51,20 +52,27 @@ type ViewAppProps = {
 }
 
 export const ViewApp = (props: ViewAppProps) =>  {
-  const _restic = props.restic
+  const FILE_SNAPSHOT_VIEW = 1
+  const VAULT_SNAPSHOT_VIEW = 2
+
   const _fileSnapshotRef = useRef<FileSnapshotMethods>(null)
-  // const app = useApp()
-  // const _curFile = app?.workspace.getActiveFile()?.path
+
+  const [viewPage, setViewPage] = useState(FILE_SNAPSHOT_VIEW)
+  const swithToFileSnapshotView = () => {
+    setViewPage(FILE_SNAPSHOT_VIEW)
+  }
+  const swithToVaultSnapshotView = () => {
+    setViewPage(VAULT_SNAPSHOT_VIEW)
+  }
 
   const iconMouseEnter = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     const _cur = event.currentTarget;
     _cur.style.color = 'var(--icon-color-hover)'
-    // _fileSnapshotRef.current?.refreshSnapshots(app?.workspace.getActiveFile()?.path)
   }
   
   const iconMouseLeave = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     const _cur = event.currentTarget;
-    _cur.style.color = 'inherit'
+    _cur.style.color = 'var(--nav-item-color)'
   }
 
   const clickBackup = (restic: Restic | undefined) => () => {
@@ -79,6 +87,15 @@ export const ViewApp = (props: ViewAppProps) =>  {
       })
   }
 
+  const renderComponent = () => {
+    switch (viewPage) {
+      case FILE_SNAPSHOT_VIEW:
+        return <FileSnapshot restic={props.restic} ref={_fileSnapshotRef}/>
+      case VAULT_SNAPSHOT_VIEW:
+        return <VaultSnapshot restic={props.restic} />
+    }
+  }
+
   return <Layout style={layoutStyle}>
     <Header style={headerStyle}>
       <CaretRightOutlined 
@@ -86,23 +103,25 @@ export const ViewApp = (props: ViewAppProps) =>  {
         aria-label='Backup' 
         onMouseEnter={iconMouseEnter}
         onMouseLeave={iconMouseLeave}
-        onClick={clickBackup(_restic)}
+        onClick={clickBackup(props.restic)}
       />
       <FileSearchOutlined 
         style={iconStyle} 
         aria-label='File Snapshot' 
         onMouseEnter={iconMouseEnter}
         onMouseLeave={iconMouseLeave}
+        onClick={swithToFileSnapshotView}
       />
       <FolderViewOutlined 
         style={iconStyle} 
         aria-label='Vault Snapshot' 
         onMouseEnter={iconMouseEnter}
         onMouseLeave={iconMouseLeave}
+        onClick={swithToVaultSnapshotView}
       />
     </Header>
     <Content style={contentStyle}>
-      <FileSnapshot restic={_restic} ref={_fileSnapshotRef}/>
+      { renderComponent() }
     </Content>
     <Footer style={footerStyle}></Footer>
   </Layout>

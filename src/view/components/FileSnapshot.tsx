@@ -1,10 +1,12 @@
+import * as path from 'path'
 import { CSSProperties, forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { Restic } from 'src/restic/restic';
-import { Tree } from 'antd'
+import { Flex, Tree } from 'antd'
 import { TreeDataNode, Empty } from 'antd'
+import { LogoutOutlined } from '@ant-design/icons';
 import { DateTime } from 'luxon';
 import { useApp } from 'src/view/hook/app';
-import { TFile } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 
 class context {
     isCancelled: boolean 
@@ -24,6 +26,90 @@ const emptyDescriptionStyle: CSSProperties = {
 
 const emptyImageStyle: CSSProperties = {
     height: 27,
+}
+
+const itemIconStyle: CSSProperties = {
+    fontSize: '14px',
+    paddingLeft: 20,
+    color: 'var(--nav-item-color)',
+}
+
+const itemStyle: CSSProperties = {
+    cursor: 'var(--cursor)',
+    display: Flex,
+    color: 'var(--nav-item-color)',
+    backgroundColor: 'var(--nav-item-background)',
+    fontWeight: 'var(--nav-item-weight)'
+}
+
+type FileSnapshotItemProps = {
+    restic: Restic | undefined
+    backupTime:  DateTime<true> | DateTime<false>
+    snapshotId: string
+    path: string
+    fullVaultPath: string
+}
+
+const FileSnapshotItem = (props:FileSnapshotItemProps) => {
+    const onMouseEnter = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        const _cur = event.currentTarget;
+        _cur.style.backgroundColor = 'var(--nav-item-background-hover)'
+        _cur.style.fontWeight = 'var(--nav-item-weight-hover)'
+    }
+    
+    const onMouseLeave = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        const _cur = event.currentTarget;
+        _cur.style.backgroundColor = 'var(--nav-item-background)'
+        _cur.style.fontWeight = 'var(--nav-item-weight)'
+    }
+
+    const onIconEnter = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        const _cur = event.currentTarget;
+        _cur.style.color = 'var(--icon-color-hover)'
+    }
+
+    const onIconLeave = (event: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+        const _cur = event.currentTarget;
+        _cur.style.color = 'var(--nav-item-color)'
+    }
+
+    const restoreFile = () => {
+        console.log('restore file -> id=' + props.snapshotId +'; vault=' + props.fullVaultPath + '; path=' + props.path)
+        if (!props.restic) {
+            return
+        }
+        const src = path.join(props.fullVaultPath, props.path)
+        const dir = path.dirname(props.path)
+        const ext = path.extname(props.path)
+        const filename = path.basename(props.path, ext) + '.restic.' + props.backupTime.toFormat('yyyyMMddHHmmss')
+        const dst = path.join(props.restic.getCurrentVault(), dir, filename + ext)
+
+        props.restic.restoreFile(props.snapshotId, src, dst)
+            .then(() => {
+                new Notice('restored successfully.')
+            })
+            .catch((err) => {
+                new Notice('failed to restore.')
+            }
+        )
+    }
+
+    return <div 
+            style={itemStyle} 
+            onMouseEnter={onMouseEnter} 
+            onMouseLeave={onMouseLeave}
+           >
+            <div style={{width: 200, display: 'inline-block', textAlign: 'left'}} >
+               {props.backupTime.toFormat('yyyy-MM-dd HH:mm:ss')}
+            </div>
+            <LogoutOutlined 
+                style={itemIconStyle} 
+                aria-label='Restore'
+                onMouseEnter={onIconEnter}
+                onMouseLeave={onIconLeave}
+                onClick={restoreFile}
+            />
+           </div>
 }
 
 type FileSnapshotProps = {
@@ -64,7 +150,7 @@ export const FileSnapshot = forwardRef<FileSnapshotMethods, FileSnapshotProps>((
         const nodes : TreeDataNode[]  = []
         const pace = 3
         const chunks = []
-        console.log("matches.length: ", matches.length)
+        console.log("find " + matches.length + " snapshots by [" + pattern + "]")
         for (let i=0; i<matches.length; i+=pace) {
             chunks.push(matches.slice(i, i+pace))
         }
@@ -81,9 +167,15 @@ export const FileSnapshot = forwardRef<FileSnapshotMethods, FileSnapshotProps>((
                 if (!snap) {
                     return null
                 }
-                const t = DateTime.fromISO(snap.time)
+                const backupTime = DateTime.fromISO(snap.time)
                 return {
-                    title: t.toFormat('yyyy-MM-dd HH:mm:ss'),
+                    title: <FileSnapshotItem 
+                                restic={props.restic}
+                                snapshotId={_match.snapshot}
+                                backupTime={backupTime}
+                                path={pattern}
+                                fullVaultPath={snap.paths[0]}
+                            /> ,
                     key: _match.snapshot,
                 }
             }))
